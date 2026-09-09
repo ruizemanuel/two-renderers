@@ -1,3 +1,5 @@
+import { Example } from "../examples/two-renderers/index";
+
 export default function Page() {
-  return <main>two-renderers</main>;
+  return <Example />;
 }

@@ -4,7 +4,9 @@
   "private": true,
   "type": "module",
   "scripts": {
+    "predev": "node scripts/stage-golden.mjs",
     "dev": "next dev",
+    "prebuild": "node scripts/stage-golden.mjs",
     "build": "next build",
     "test": "vitest run",
     "typecheck": "tsc --noEmit"
@@ -17,12 +19,15 @@
     "vgpu": "^0.4.0"
   },
   "devDependencies": {
+    "@tailwindcss/postcss": "^4.3.3",
     "@testing-library/dom": "^10.4.1",
     "@testing-library/react": "^16.3.3",
     "@types/node": "^26.5.0",
     "@types/react": "^19.2.18",
     "esbuild": "^0.28.2",
     "jsdom": "^30.0.1",
+    "postcss": "^8.5.28",
+    "tailwindcss": "^4.3.3",
     "typescript": "^7.0.2",
     "vitest": "^5.0.0"
   }
