@@ -9,3 +9,4 @@ docs/superpowers/specs/
 docs/superpowers/plans/
 PROMPT.md
 public/*.bin
+next-env.d.ts
