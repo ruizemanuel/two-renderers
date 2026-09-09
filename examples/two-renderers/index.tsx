@@ -27,6 +27,7 @@ export function Example() {
   const [probe, setProbe] = useState<Probe | null>(null);
   const [gain, setGain] = useState(1);
   const [failure, setFailure] = useState<Failure>("none");
+  const [deviceLost, setDeviceLost] = useState(false);
 
   useEffect(() => {
     let live = true;
@@ -51,6 +52,11 @@ export function Example() {
         }
         started = made;
         setProbe(made);
+        // Panels 1 and 2 are 2D bitmaps by now and survive a lost device; only
+        // the amplification pass needs the GPU still to be there.
+        void made.lost.then(() => {
+          if (live) setDeviceLost(true);
+        });
       } catch {
         if (live) setFailure("no-webgpu");
       }
@@ -129,11 +135,12 @@ export function Example() {
                 key={g}
                 type="button"
                 aria-pressed={g === gain}
+                disabled={deviceLost}
                 onClick={() => {
                   setGain(g);
                   probe.setAmplification(g);
                 }}
-                className={`rounded px-3 py-1 text-xs tabular-nums transition-colors ${
+                className={`rounded px-3 py-1 text-xs tabular-nums transition-colors disabled:cursor-not-allowed disabled:opacity-40 ${
                   g === gain ? "bg-white text-black" : "text-neutral-400 hover:text-white"
                 }`}
               >
@@ -141,6 +148,13 @@ export function Example() {
               </button>
             ))}
           </div>
+          {deviceLost && (
+            <p className="text-sm leading-relaxed">
+              The GPU device was lost, so the panels are frozen at the last result and the
+              amplification control is inert. The measurement above still stands: it was taken
+              before the device went away.
+            </p>
+          )}
         </div>
       )}
     </main>

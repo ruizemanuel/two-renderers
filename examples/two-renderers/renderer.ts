@@ -9,6 +9,12 @@ import { SCENE_SIZE, createScene } from "./scene";
 export type Probe = {
   readonly comparison: Comparison;
   readonly adapterLabel: string;
+  /**
+   * Resolves if the device is lost for any reason other than this probe's own
+   * `dispose()`. Never rejects: losing a device is a thing that happens to a
+   * page, not an error it made.
+   */
+  readonly lost: Promise<void>;
   setAmplification(gain: number): void;
   dispose(): void;
 };
@@ -61,6 +67,15 @@ export async function createProbe(opts: {
   const nearest = sampler(gpu, { magFilter: "nearest", minFilter: "nearest" });
   const diff: Effect = effect(gpu, diffSource, { label: "diff" });
 
+  // `dispose()` destroys the device, which settles `lost` with reason
+  // "destroyed". That is our own teardown; forwarding it would tell every
+  // visitor who navigates away that their GPU fell over.
+  const lost = new Promise<void>((resolve) => {
+    void gpu.gpu.lost.then((info) => {
+      if (info.reason !== "destroyed") resolve();
+    });
+  });
+
   const setAmplification = (gain: number) => {
     diff
       .set({ golden: goldenTexture, mine: mine.color, samp: nearest, amplify: gain })
@@ -71,6 +86,7 @@ export async function createProbe(opts: {
 
   return {
     comparison,
+    lost,
     // `adapter` on the browser's Gpu is the adapter object, not a description of
     // it, so the label has to come from WebGPU itself.
     adapterLabel: await adapterLabel(),

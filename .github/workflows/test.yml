@@ -30,3 +30,8 @@ jobs:
 
       - run: npm run typecheck
       - run: npm test
+
+      # Builds too, because `prebuild` is what copies the golden into public/.
+      # Without this, the one step the page depends on to find its reference is
+      # the one step nothing checks.
+      - run: npm run build

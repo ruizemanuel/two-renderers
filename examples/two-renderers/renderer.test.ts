@@ -23,12 +23,18 @@ function setup(minePixels: Uint8Array) {
     return t;
   });
   const writeTexture = vi.fn();
+  // The real device settles this promise on loss — and also on destroy(), which
+  // is what dispose() does. The test drives both.
+  let settleLost: (info: { reason: string }) => void = () => {};
+  const lost = new Promise<{ reason: string }>((resolve) => {
+    settleLost = resolve;
+  });
   mocks.init.mockResolvedValue({
     // No `adapter` here on purpose: the browser's Gpu does not have one. If a
     // future change reads gpu.adapter, this mock makes it fail rather than
     // quietly return undefined.
     device: { createTexture: vi.fn(() => ({ gpu: {}, destroy: vi.fn() })) },
-    gpu: { queue: { writeTexture } },
+    gpu: { queue: { writeTexture }, lost },
     dispose: vi.fn(),
   });
   // navigator.gpu is where the adapter label actually comes from.
@@ -54,7 +60,7 @@ function setup(minePixels: Uint8Array) {
         putImageData: vi.fn((img: { data: Uint8ClampedArray }) => painted.push(img)),
       })),
     }) as never;
-  return { fx, made, canvas, writeTexture, painted };
+  return { fx, made, canvas, writeTexture, painted, settleLost };
 }
 
 afterEach(() => {
@@ -99,6 +105,42 @@ describe("createProbe", () => {
     expect(fx.set).toHaveBeenCalledWith(expect.objectContaining({ amplify: 32 }));
     // exactly one more draw: the diff pass, never the scene
     expect(fx.draw.mock.calls.length).toBe(drawsAfterSetup + 1);
+  });
+
+  it("reports a lost device, but not the loss its own dispose() causes", async () => {
+    // `dispose()` destroys the device, which settles the same promise with
+    // reason "destroyed". Reporting that would mean every unmount tells the
+    // visitor their GPU fell over.
+    const bytes = new Uint8Array(SIZE * SIZE * 4);
+    const { canvas, settleLost } = setup(bytes);
+    const probe = await createProbe({
+      golden: bytes,
+      mineCanvas: canvas(),
+      diffCanvas: canvas(),
+    });
+
+    let reported = false;
+    void probe.lost.then(() => {
+      reported = true;
+    });
+
+    settleLost({ reason: "destroyed" });
+    await Promise.resolve();
+    await Promise.resolve();
+    expect(reported).toBe(false);
+  });
+
+  it("reports a genuine device loss", async () => {
+    const bytes = new Uint8Array(SIZE * SIZE * 4);
+    const { canvas, settleLost } = setup(bytes);
+    const probe = await createProbe({
+      golden: bytes,
+      mineCanvas: canvas(),
+      diffCanvas: canvas(),
+    });
+
+    settleLost({ reason: "unknown" });
+    await expect(probe.lost).resolves.toBeUndefined();
   });
 
   it("rejects a golden that is not one frame", async () => {

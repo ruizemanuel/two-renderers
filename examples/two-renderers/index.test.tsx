@@ -10,6 +10,17 @@ vi.mock("./renderer", () => ({ createProbe: vi.fn() }));
 const reference = () =>
   ({ ok: true, arrayBuffer: async () => new ArrayBuffer(2 * 2 * 4) }) as Response;
 
+/** A probe that has already measured, with a device loss the test controls. */
+function fakeProbe(lost: Promise<void>) {
+  return {
+    comparison: { total: 4, differing: 1, percent: 25, maxDelta: 1 },
+    adapterLabel: "test · arch-1",
+    lost,
+    setAmplification: vi.fn(),
+    dispose: vi.fn(),
+  };
+}
+
 afterEach(() => {
   vi.resetAllMocks();
   vi.unstubAllGlobals();
@@ -57,6 +68,32 @@ describe("the page", () => {
     expect(await screen.findByText(/reference frame could not be loaded/i)).toBeTruthy();
     expect(screen.queryByText(/needs WebGPU/i)).toBeNull();
     expect(createProbe).not.toHaveBeenCalled();
+  });
+
+  it("freezes and says so when the device is lost", async () => {
+    // Panels 1 and 2 are 2D bitmaps and survive; only the amplification control
+    // needs the device. A button that silently stops working is the one failure
+    // the rest of this page takes care to avoid.
+    let lose: () => void = () => {};
+    const lost = new Promise<void>((resolve) => {
+      lose = resolve;
+    });
+    vi.stubGlobal("fetch", vi.fn(async () => reference()));
+    vi.mocked(createProbe).mockResolvedValue(fakeProbe(lost));
+
+    render(<Example />);
+
+    const gain = () => screen.getByRole("button", { name: "×64" }) as HTMLButtonElement;
+    await screen.findByRole("button", { name: "×64" });
+    expect(gain().disabled).toBe(false);
+
+    lose();
+
+    expect(await screen.findByText(/device was lost/i)).toBeTruthy();
+    expect(gain().disabled).toBe(true);
+    // The measurement stands: it was taken before the device went away. Read
+    // through the container, because the count itself sits in its own span.
+    expect(screen.getByRole("main").textContent).toContain("1 of 4 pixels differ");
   });
 
   it("never promises a bound it only measured once", () => {
