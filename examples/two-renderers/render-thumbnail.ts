@@ -2,8 +2,9 @@ import type { Gpu, Target } from "vgpu";
 import { createScene } from "./scene";
 
 /**
- * The gallery's thumbnail hook. Nothing to park for a deterministic capture:
- * the scene takes no time and no input, so any two calls draw the same frame.
+ * The gallery's thumbnail hook. There is no clock or input to park before
+ * capturing: the scene takes neither, so two calls on one renderer draw the
+ * same frame.
  */
 export async function renderThumbnail(gpu: Gpu, output: Target): Promise<void> {
   const scene = createScene(gpu);
