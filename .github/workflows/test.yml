@@ -1,0 +1,32 @@
+name: test
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  test:
+    # Linux on purpose. It is the only platform the pinned CPU renderer exists
+    # for, so it is the only place golden.test.ts runs instead of skipping — and
+    # a golden test that only runs when someone remembers to open WSL is not a
+    # test, it is a note to self.
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: npm
+
+      - run: npm ci
+
+      - name: Install the pinned CPU renderer
+        run: npx vgpu install-software-renderer
+
+      - name: Record which adapter will render
+        # Printed into the log on purpose: when a golden test fails, the first
+        # question is always which renderer produced the pixels.
+        run: npx vgpu doctor
+
+      - run: npm run typecheck
+      - run: npm test

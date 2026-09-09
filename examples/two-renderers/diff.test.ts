@@ -55,13 +55,18 @@ describe.skipIf(!SOFTWARE)("diff", () => {
       // prints is suspect.
       expect((await run(same[0], same[1], 64)).lit).toBe(0);
 
-      // One step apart: invisible at ×1, unmistakable at ×64. That gap is the
-      // argument the page makes, so it is worth pinning to a number.
+      // One step apart: invisible at ×1, unmistakable once amplified. That gap
+      // is the argument the page makes, so it is worth pinning to numbers.
       const plain = await run(same[0], off, 1);
       const amplified = await run(same[0], off, 64);
       expect(plain.peak).toBeLessThanOrEqual(1);
       expect(amplified.lit).toBe(amplified.total);
       expect(amplified.peak).toBeGreaterThan(32);
+
+      // 255 is not an arbitrary maximum: it is exactly the gain at which one
+      // step of 255 reaches full scale, so every pixel that differs at all is
+      // lit to the top. That is what makes it the honest end of the control.
+      expect((await run(same[0], off, 255)).peak).toBe(255);
     } finally {
       gpu.dispose();
     }

@@ -41,6 +41,10 @@ The pure tests run anywhere. The suites that need the pinned CPU renderer
 **PASS with tests skipped and zero failed**. A single `failed` is a regression; a
 `skipped` on Windows is not.
 
+CI runs the whole suite on `ubuntu-latest`, which is the point: that is where the
+golden test runs instead of skipping. A golden test that only runs when someone
+remembers to open a Linux box is a note to self, not a test.
+
 ## Regenerating the golden
 
 Linux only, and only on the pinned renderer:

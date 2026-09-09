@@ -28,9 +28,28 @@ describe("the page", () => {
     expect(screen.queryByText(/^Error/)).toBeNull();
   });
 
+  it("gives a dropped connection a second try before giving up", async () => {
+    // A same-origin static asset mostly fails by losing the connection, not by
+    // being absent. Retrying is cheaper than telling the visitor the page is
+    // broken.
+    const fetchMock = vi
+      .fn()
+      .mockRejectedValueOnce(new Error("network"))
+      .mockResolvedValueOnce(reference());
+    vi.stubGlobal("fetch", fetchMock);
+    vi.mocked(createProbe).mockRejectedValue(new Error("no WebGPU"));
+
+    render(<Example />);
+
+    expect(await screen.findByText(/needs WebGPU/i)).toBeTruthy();
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    expect(screen.queryByText(/reference frame could not be loaded/i)).toBeNull();
+  });
+
   it("says the reference is missing rather than blaming the browser", async () => {
     // The two causes send you to fix different things, so they cannot share one
     // message: WebGPU may be perfectly fine and the asset simply absent.
+    // Two 404s, so the retry is exhausted rather than merely unlucky.
     vi.stubGlobal("fetch", vi.fn(async () => ({ ok: false, status: 404 }) as Response));
 
     render(<Example />);

@@ -4,7 +4,11 @@ import { useEffect, useRef, useState } from "react";
 import { GOLDEN_FILE } from "./golden";
 import { createProbe, type Probe } from "./renderer";
 
-const GAINS = [1, 4, 16, 64];
+// 255 is the end of the scale, not an arbitrary maximum: one step of 255 is
+// exactly full brightness at that gain, so every pixel that differs at all
+// lights up. Measured: at ×64 a one-step difference only reaches 64/255, and
+// the panel scales down from 512, which dims it further.
+const GAINS = [1, 4, 16, 64, 255];
 
 /** The page is written in English, so its numbers are too: a visitor's locale
  *  would render 262144 as "262.144" next to English prose, which reads as a
@@ -28,12 +32,8 @@ export function Example() {
     let live = true;
     let started: Probe | null = null;
     (async () => {
-      let bytes: Uint8Array;
-      try {
-        const response = await fetch(GOLDEN_FILE);
-        if (!response.ok) throw new Error(`${response.status}`);
-        bytes = new Uint8Array(await response.arrayBuffer());
-      } catch {
+      const bytes = await fetchGolden();
+      if (!bytes) {
         if (live) setFailure("no-golden");
         return;
       }
@@ -79,8 +79,9 @@ export function Example() {
         </p>
         <p className="text-sm leading-relaxed">
           At ×1 that panel is black. That is the point: you need to amplify the difference
-          before you can see it. It is also why a golden-image test can run at zero tolerance
-          against the pinned renderer, and could not against a real GPU.
+          before you can see it. At ×255 every pixel that differs at all is lit, because one
+          step of 255 is full brightness at that gain. It is also why a golden-image test can
+          run at zero tolerance against the pinned renderer, and could not against a real GPU.
         </p>
       </header>
 
@@ -166,6 +167,23 @@ function Panel({
       <canvas ref={ref} className="block aspect-square w-full rounded ring-1 ring-white/10" />
     </figure>
   );
+}
+
+/**
+ * The reference, or null. One retry: the realistic way a same-origin static
+ * asset fails is a dropped connection, and a second attempt costs nothing
+ * against the alternative of telling the visitor the page is broken.
+ */
+async function fetchGolden(): Promise<Uint8Array | null> {
+  for (let attempt = 0; attempt < 2; attempt++) {
+    try {
+      const response = await fetch(GOLDEN_FILE);
+      if (response.ok) return new Uint8Array(await response.arrayBuffer());
+    } catch {
+      // Fall through: a thrown fetch and a bad status get the same second try.
+    }
+  }
+  return null;
 }
 
 /** Same trick as renderer.ts: the context hands out the buffer, so this file
