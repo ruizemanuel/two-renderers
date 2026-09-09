@@ -1,0 +1,10 @@
+node_modules/
+.next/
+dist/
+tsconfig.tsbuildinfo
+.vercel/
+
+# Specs, plans and the session prompt stay out of git on purpose.
+docs/superpowers/specs/
+docs/superpowers/plans/
+PROMPT.md
