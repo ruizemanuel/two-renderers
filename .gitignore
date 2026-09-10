@@ -10,3 +10,6 @@ docs/superpowers/plans/
 PROMPT.md
 public/*.bin
 next-env.d.ts
+
+.vercel
+.env*
