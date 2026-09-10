@@ -4,7 +4,13 @@ import { render, screen } from "@testing-library/react";
 import { Example } from "./index";
 import { createProbe } from "./renderer";
 
-vi.mock("./renderer", () => ({ createProbe: vi.fn() }));
+// MAX_GAIN comes through unmocked: it is the one constant the page and the
+// renderer have to agree on, so a test that invented its own would not be
+// testing the page the visitor gets.
+vi.mock("./renderer", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("./renderer")>()),
+  createProbe: vi.fn(),
+}));
 
 /** A reference small enough to be cheap and square enough to paint. */
 const reference = () =>
@@ -17,6 +23,7 @@ function fakeProbe(lost: Promise<void>) {
     adapterLabel: "test · arch-1",
     lost,
     setAmplification: vi.fn(),
+    currentGain: () => 255,
     dispose: vi.fn(),
   };
 }

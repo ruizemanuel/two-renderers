@@ -3,9 +3,11 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 const mocks = vi.hoisted(() => ({
   effect: vi.fn(),
   sampler: vi.fn(() => ({})),
-  surface: vi.fn(),
+  surface: vi.fn(() => ({ kind: "surface" })),
   target: vi.fn(),
   init: vi.fn(),
+  clock: vi.fn(),
+  frameLoop: vi.fn(),
 }));
 vi.mock("vgpu", () => mocks);
 
@@ -14,8 +16,24 @@ import { createProbe } from "./renderer";
 const SIZE = 512;
 
 function setup(minePixels: Uint8Array) {
-  const fx = { draw: vi.fn(() => fx), set: vi.fn(() => fx), destroy: vi.fn() };
-  mocks.effect.mockReturnValue(fx);
+  // Two effects, told apart by their label, so a test can say which one drew.
+  const film = { draw: vi.fn(() => film), set: vi.fn(() => film) };
+  const diff = { draw: vi.fn(() => diff), set: vi.fn(() => diff) };
+  mocks.effect.mockImplementation((_gpu: unknown, _src: unknown, opts?: { label?: string }) =>
+    opts?.label === "diff" ? diff : film,
+  );
+
+  // The loop is captured rather than run: the test ticks it by hand, with a
+  // clock it controls, which is the only way to watch a sweep deterministically.
+  const ticker = { time: 0 };
+  mocks.clock.mockReturnValue(ticker);
+  const passes: [unknown, unknown][] = [];
+  let tick: ((frame: { pass: (t: unknown, e: unknown) => void }) => void) | undefined;
+  mocks.frameLoop.mockImplementation((_gpu: unknown, cb: typeof tick) => {
+    tick = cb;
+    return { stop: vi.fn() };
+  });
+  const run = () => tick?.({ pass: (t, e) => passes.push([t, e]) });
   const made: unknown[] = [];
   mocks.target.mockImplementation(() => {
     const t = { color: {}, size: [SIZE, SIZE], read: vi.fn(async () => minePixels) };
@@ -60,7 +78,7 @@ function setup(minePixels: Uint8Array) {
         putImageData: vi.fn((img: { data: Uint8ClampedArray }) => painted.push(img)),
       })),
     }) as never;
-  return { fx, made, canvas, writeTexture, painted, settleLost };
+  return { film, diff, made, canvas, writeTexture, painted, settleLost, ticker, run, passes };
 }
 
 afterEach(() => {
@@ -91,20 +109,37 @@ describe("createProbe", () => {
     expect(painted[0]?.data[0]).toBe(1);
   });
 
-  it("changes only the gain uniform when amplification moves", async () => {
-    // The scene must not be re-rendered: it is the expensive half, and the
-    // control is meant to feel instantaneous.
+  it("sweeps the gain on its own, and pins it when asked", async () => {
     const bytes = new Uint8Array(SIZE * SIZE * 4);
-    const { fx, canvas } = setup(bytes);
+    const { film, diff, canvas, ticker, run, passes } = setup(bytes);
     const probe = await createProbe({ golden: bytes, mineCanvas: canvas(), diffCanvas: canvas() });
 
-    const drawsAfterSetup = fx.draw.mock.calls.length;
-    fx.set.mockClear();
-    probe.setAmplification(32);
+    // Left alone, the gain moves with the clock and nothing else.
+    ticker.time = 0;
+    run();
+    const first = probe.currentGain();
+    ticker.time = 2.5;
+    run();
+    expect(probe.currentGain()).not.toBe(first);
+    expect(diff.set).toHaveBeenLastCalledWith(
+      expect.objectContaining({ amplify: probe.currentGain() }),
+    );
 
-    expect(fx.set).toHaveBeenCalledWith(expect.objectContaining({ amplify: 32 }));
-    // exactly one more draw: the diff pass, never the scene
-    expect(fx.draw.mock.calls.length).toBe(drawsAfterSetup + 1);
+    // Pinned, the clock stops mattering.
+    probe.setAmplification(32);
+    ticker.time = 5;
+    run();
+    expect(probe.currentGain()).toBe(32);
+    expect(diff.set).toHaveBeenLastCalledWith(expect.objectContaining({ amplify: 32 }));
+
+    // And back, without the scene ever being drawn a second time: it is the
+    // expensive half, and the control is meant to feel instantaneous.
+    probe.setAmplification("auto");
+    ticker.time = 7.5;
+    run();
+    expect(probe.currentGain()).not.toBe(32);
+    expect(film.draw).toHaveBeenCalledTimes(1);
+    expect(passes.every(([t]) => (t as { kind: string }).kind === "surface")).toBe(true);
   });
 
   it("reports a lost device, but not the loss its own dispose() causes", async () => {
