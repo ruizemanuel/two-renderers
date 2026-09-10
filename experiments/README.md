@@ -34,3 +34,10 @@ jumps 52.25 nm at once — about 23% of an interference cycle.
 
 Fewer pixels differ with the terraces on, because quantising the thickness hides
 the small changes and concentrates the error into the jumps.
+
+The same chain is visible on the Apple GPU itself, in the difference panel at
+×16: one bright block with straight edges, about 39x41 pixels of the 512-pixel
+canvas, which is the size of a value-noise cell at the third octave — cells are
+axis-aligned squares, so a flipped one is a rectangle and not a smudge. A
+brighter curve runs through that block, which is the terrace contour crossing it.
+Everything else is scattered single points, the ordinary one-step rounding.
