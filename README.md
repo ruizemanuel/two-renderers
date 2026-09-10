@@ -12,9 +12,12 @@ it is not. The permitted phrasing is:
 > **"bit-identical on the pinned CPU renderer"**
 
 Two renders from the pinned renderer are the same bytes. The same shader on a
-real GPU is a few percent of pixels away, each of them by a step or so. The page
-measures that live, on your machine, and shows what it measured — it does not
-promise a bound, because there isn't one in the specification.
+real GPU is a few percent of pixels away: most of those by a single step, and a
+few by a great deal more, where a rounding difference pushed a pixel across one
+of the scene's own edges. Measured on an Apple GPU, the largest difference was 44
+steps out of 255; on an AMD GCN4 it was 1. The page measures that live, on your
+machine, and shows what it measured — it does not promise a bound, because there
+isn't one in the specification.
 
 ## What is worth copying out of here
 

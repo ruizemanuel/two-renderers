@@ -84,10 +84,14 @@ export function Example() {
           different GPUs they are not, and the panel on the right is where they disagree.
         </p>
         <p className="text-sm leading-relaxed">
-          At ×1 that panel is black. That is the point: you need to amplify the difference
-          before you can see it. At ×255 every pixel that differs at all is lit, because one
-          step of 255 is full brightness at that gain. It is also why a golden-image test can
-          run at zero tolerance against the pinned renderer, and could not against a real GPU.
+          At ×1 that panel is black, or nearly so: on most GPUs every difference is a step
+          or two out of 255, far below what a screen can show, and you have to amplify it
+          before you can see anything at all. What does show up at low gain is a pixel that
+          crossed one of the scene&rsquo;s own edges — a noise cell, or a thickness terrace —
+          where a rounding difference stops being one. At ×255 every pixel that differs at
+          all is lit, because one step of 255 is full brightness at that gain. It is also why
+          a golden-image test can run at zero tolerance against the pinned renderer, and
+          could not against a real GPU.
         </p>
       </header>
 
